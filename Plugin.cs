@@ -26,7 +26,7 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
 {
     public override string ModuleName => "Match Pause Manager";
 
-    public override string ModuleVersion => "1.3.2";
+    public override string ModuleVersion => "1.3.3";
 
     public override string ModuleAuthor => "A1rLeSS";
 
@@ -170,6 +170,11 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
             case "rewind":
                 TryRewind(player);
                 break;
+
+            case "mpstatus":
+            case "status":
+                PrintStatus(player);
+                break;
         }
     }
 
@@ -198,6 +203,12 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
     public void OnRewindCommand(CCSPlayerController? player, CommandInfo info)
     {
         TryRewind(player);
+    }
+
+    [ConsoleCommand("css_mpstatus", "Print the MatchPauseManager state")]
+    public void OnStatusCommand(CCSPlayerController? player, CommandInfo info)
+    {
+        PrintStatus(player);
     }
 
     // ------------------------------------------------------------ game events
@@ -300,8 +311,7 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
 
     private void TryStartTacticalPause(CCSPlayerController? player)
     {
-        var rules = Utilities.GetGameRules();
-        if (rules is { WarmupPeriod: true })
+        if (IsWarmupActive())
         {
             Reply(player, Txt.GuardWarmup);
             return;
@@ -478,8 +488,7 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
 
     private void TryStartTechnicalPause(CCSPlayerController? player)
     {
-        var rules = Utilities.GetGameRules();
-        if (rules is { WarmupPeriod: true })
+        if (IsWarmupActive())
         {
             Reply(player, Txt.GuardWarmup);
             return;
@@ -1141,6 +1150,22 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
         }
     }
 
+    /// <summary>
+    /// True when the game is in warmup. A match that already played a round is
+    /// never treated as warmup, even when the engine flag is still set (for
+    /// example after a restart or a config that never ran mp_warmup_end).
+    /// </summary>
+    private static bool IsWarmupActive()
+    {
+        var rules = Utilities.GetGameRules();
+        if (rules is not { WarmupPeriod: true })
+        {
+            return false;
+        }
+
+        return rules.TotalRoundsPlayed <= 0;
+    }
+
     /// <summary>Marks the next few commands as originating from the plugin itself.</summary>
     private void IssuePause() => ExecuteInternal("mp_pause_match");
 
@@ -1163,6 +1188,68 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
 
     private bool IsInternalCommand()
         => _internalDepth > 0 || Server.TickCount <= _internalUntilTick;
+
+    /// <summary>Prints the raw game state the plugin works with.</summary>
+    private void PrintStatus(CCSPlayerController? player)
+    {
+        var rules = Utilities.GetGameRules();
+        var flagWarmup = false;
+        var freeze = false;
+        var paused = false;
+        var rounds = -1;
+        var phase = -1;
+        var matchStarted = false;
+
+        if (rules != null)
+        {
+            flagWarmup = rules.WarmupPeriod;
+            freeze = rules.FreezePeriod;
+            paused = IsPaused(rules);
+            rounds = rules.TotalRoundsPlayed;
+            phase = rules.GamePhase;
+            matchStarted = rules.HasMatchStarted;
+        }
+
+        ReplyRaw(player, string.Format(
+            "warmup={0}(flag={1}) freeze={2} paused={3} rounds={4} phase={5} matchStarted={6} | state={7} caller={8} tacA={9} tacB={10} | snapshot={11} snapRound={12} armed={13} auto={14} legacy={15}",
+            IsWarmupActive() ? 1 : 0,
+            flagWarmup ? 1 : 0,
+            freeze ? 1 : 0,
+            paused ? 1 : 0,
+            rounds,
+            phase,
+            matchStarted ? 1 : 0,
+            (int)_state,
+            _callerTeam,
+            _tacRemaining[0],
+            _tacRemaining[1],
+            _snapshot is { IsValid: true } ? 1 : 0,
+            _snapshot?.RoundsPlayed ?? -1,
+            _rewindArmed ? 1 : 0,
+            _autoRestore ? 1 : 0,
+            _legacyVoid ? 1 : 0));
+
+        ReplyRaw(player, string.Format(
+            "damageGate={0} rewindEnabled={1} rewindStats={2} textStyle={3} warnChat={4}",
+            _config.TechnicalDamageGate ? 1 : 0,
+            _config.RewindEnabled ? 1 : 0,
+            _config.RewindPlayerStats ? 1 : 0,
+            _config.TextStyle,
+            _config.WarnChatDuringTechnical ? 1 : 0));
+    }
+
+    private static void ReplyRaw(CCSPlayerController? player, string text)
+    {
+        var line = $"{ChatColors.Grey}[CM]{ChatColors.Default} {text}";
+
+        if (player != null && player.IsValid)
+        {
+            player.PrintToChat(line);
+            return;
+        }
+
+        Server.PrintToConsole(line);
+    }
 
     private void PrintAll(Txt id, params object[] args)
         => Server.PrintToChatAll(Texts.Chat(id, args));

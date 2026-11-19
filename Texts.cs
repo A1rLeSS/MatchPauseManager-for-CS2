@@ -113,7 +113,7 @@ public static class Texts
         [Txt.GuardOnlyCallingTeam] = "{d}ONLY THE CALLING TEAM MAY END THIS TIMEOUT",
         [Txt.GuardTacNotStarted] = "{d}THE PAUSE HAS NOT STARTED YET",
         [Txt.GuardPendingTech] = "{d}A TECHNICAL PAUSE IS ALREADY BEING PREPARED",
-        [Txt.GuardWarmup] = "{r}NOT AVAILABLE DURING WARMUP",
+        [Txt.GuardWarmup] = "{r}WARMUP IS ACTIVE{d} — RUN mp_warmup_end TO START THE MATCH",
     };
 
     private static readonly Dictionary<Txt, string> Cn = new()
@@ -196,7 +196,7 @@ public static class Texts
         [Txt.GuardOnlyCallingTeam] = "{d}只有发起方队伍可以结束本次暂停",
         [Txt.GuardTacNotStarted] = "{d}暂停尚未开始",
         [Txt.GuardPendingTech] = "{d}技术暂停正在准备中",
-        [Txt.GuardWarmup] = "{r}热身阶段不可用",
+        [Txt.GuardWarmup] = "{r}当前处于热身阶段{d} — 执行 mp_warmup_end 开始比赛",
     };
 
     /// <summary>Style 2: international pack plus the rule reminders tournaments display.</summary>
