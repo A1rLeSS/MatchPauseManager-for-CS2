@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>MatchPauseManager</AssemblyName>
+    <RootNamespace>MatchPauseManager</RootNamespace>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS8618</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="tools/**" />
+    <None Remove="tools/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CounterStrikeSharp.API" Version="1.0.380" />
+  </ItemGroup>
+
+</Project>

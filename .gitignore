@@ -1,0 +1,8 @@
+bin/
+obj/
+tools/ApiDump/bin/
+tools/ApiDump/obj/
+*.user
+.vs/
+.idea/
+dist/
