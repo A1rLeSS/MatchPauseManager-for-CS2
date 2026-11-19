@@ -22,6 +22,7 @@ The plugin is built for CounterStrikeSharp and Metamod:Source. Since SourceMod d
 ### Technical pause
 - `!tech` from a player = team pause; `mp_pause_match` from the server console / rcon = **referee**
 - **Damage gate**: when the round has **no damage yet**, `CCSGameRules.TerminateRound()` voids it immediately, the freeze time that follows is paused and the **pre-round state is restored automatically** (no referee confirmation). When damage was **already done**, the round is played out first, paused in the next freeze time and the **referee decides** whether to restore it
+- Tactical and technical pauses are refused during warmup, and a technical pause that is unpaused from outside the plugin releases its state instead of staying stuck
 - Referee and team pauses use different wording; a referee pause can only be resumed by the referee
 - A pending request can be cancelled with `!unpause` / `mp_unpause_match`
 - The pause is verified every second after it is issued
@@ -74,8 +75,8 @@ The plugin creates `config.json` in its plugin directory on first load. Edit the
 | `tacticalTime` | `30` | Tactical pause duration in seconds (1–300). |
 | `tacticalCount` | `3` | Tactical pauses available to each team during regulation. |
 | `overtimeCount` | `1` | Tactical pauses available to each team per overtime segment. |
-| `technicalDamageGate` | `true` | If `true`, round handling depends on whether damage has occurred. If `false`, a technical pause always voids the current round. |
-| `rewindEnabled` | `true` | Allows referees to rewind an invalidated round. |
+| `technicalDamageGate` | `true` | If `true`, round handling depends on whether damage has occurred (no damage: void and restore automatically; damage: play it out, referee confirms the restore). If `false`, legacy behaviour: always void and restart the round without any restore. |
+| `rewindEnabled` | `true` | Allows rewinding an invalidated round. When set to `false`, the "no damage" case no longer voids the round: it is paused in place and kept. |
 | `rewindPlayerStats` | `true` | Attempts to clear per-round player stats when rewinding. |
 | `textStyle` | `0` | Message pack: `0` international English, `1` Chinese, `2` international English with rule reminders. |
 | `warnChatDuringTechnical` | `true` | Warns players who chat during a technical pause. |

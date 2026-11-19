@@ -26,7 +26,7 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
 {
     public override string ModuleName => "Match Pause Manager";
 
-    public override string ModuleVersion => "1.3.1";
+    public override string ModuleVersion => "1.3.2";
 
     public override string ModuleAuthor => "A1rLeSS";
 
@@ -54,7 +54,11 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
 
     private int _stallTicks;
 
-    private int _quietCommands;
+    /// <summary>Depth of plugin-issued commands currently executing.</summary>
+    private int _internalDepth;
+
+    /// <summary>Tick until which plugin-issued commands may still be in the queue.</summary>
+    private int _internalUntilTick = -1;
 
     private readonly int[] _tacRemaining = new int[2];
 
@@ -75,6 +79,9 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
     /// round start state is rolled back without a referee confirmation.
     /// </summary>
     private bool _autoRestore;
+
+    /// <summary>Legacy behaviour (technicalDamageGate = false): void, never restore.</summary>
+    private bool _legacyVoid;
 
     private bool _rewindArmed;
 
@@ -218,7 +225,7 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
          * started is paused as well (CS2 applies mp_pause_match at a freeze).
          */
 
-        if (_state == PauseState.TechnicalPending)
+        if (_state is PauseState.TechnicalPending or PauseState.TacticalPending)
         {
             IssuePause();
         }
@@ -251,7 +258,7 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
 
     private HookResult OnNativePauseMatch(CCSPlayerController? player, CommandInfo info)
     {
-        if (_quietCommands > 0)
+        if (IsInternalCommand())
         {
             return HookResult.Continue;
         }
@@ -269,7 +276,7 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
 
     private HookResult OnNativeUnpauseMatch(CCSPlayerController? player, CommandInfo info)
     {
-        if (_quietCommands > 0)
+        if (IsInternalCommand())
         {
             return HookResult.Continue;
         }
@@ -293,6 +300,13 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
 
     private void TryStartTacticalPause(CCSPlayerController? player)
     {
+        var rules = Utilities.GetGameRules();
+        if (rules is { WarmupPeriod: true })
+        {
+            Reply(player, Txt.GuardWarmup);
+            return;
+        }
+
         if (player == null || !player.IsValid || player.IsBot || player.IsHLTV)
         {
             Reply(player, Txt.GuardTacPlayerOnly);
@@ -359,6 +373,10 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
         }
 
         _pendingTicks++;
+
+        // keep the pending HUD alive while CS2 waits for the next freeze time
+        ShowHud(new[] { Texts.Get(Txt.HudTacPending, TeamName(_pausingTeam)) });
+
         if (_pendingTicks > 180)
         {
             // three minutes without the game pausing: refund and give up
@@ -460,7 +478,12 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
 
     private void TryStartTechnicalPause(CCSPlayerController? player)
     {
-        var referee = player == null || IsReferee(player);
+        var rules = Utilities.GetGameRules();
+        if (rules is { WarmupPeriod: true })
+        {
+            Reply(player, Txt.GuardWarmup);
+            return;
+        }
 
         if (_state is PauseState.TechnicalPending or PauseState.TechnicalActive)
         {
@@ -488,6 +511,7 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
         _roundRestored = false;
         _rewindArmed = false;
         _autoRestore = false;
+        _legacyVoid = false;
         _pendingTicks = 0;
         _state = PauseState.TechnicalPending;
 
@@ -500,25 +524,61 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
             PrintAll(Txt.TechCalledTeam, TeamName(team));
         }
 
-        if (!_config.TechnicalDamageGate || _roundHasDamage)
+        var hud = Texts.Get(team < 0 ? Txt.HudTechWillFinishRef : Txt.HudTechWillFinishTeam, TeamName(team));
+        var terminate = Utilities.GetGameRules();
+
+        if (!_config.TechnicalDamageGate)
         {
             /*
-             * Damage already done (or the gate is disabled): the round is
-             * played out first and the referee decides about the restore.
+             * Legacy behaviour, mirroring sm_mp_technical_damage_gate 0 on the
+             * CS:GO side: void the round at once and never restore it.
              */
 
-            _roundInvalidated = _config.TechnicalDamageGate && _roundHasDamage;
-            _snapshotLocked = _roundInvalidated;
+            _legacyVoid = true;
+            _roundInvalidated = true;
+            _snapshotLocked = true;
 
-            if (_roundInvalidated)
-            {
-                PrintAll(Txt.TechDamage);
-                PrintAll(Txt.TechAfterRound);
-            }
+            PrintAll(Txt.TechGateOffVoid);
+            ShowHud(new[] { hud });
 
-            ShowHud(new[] { Texts.Get(team < 0 ? Txt.HudTechWillFinishRef : Txt.HudTechWillFinishTeam, TeamName(team)) });
+            terminate?.TerminateRound(0.1f, RoundEndReason.RoundDraw);
+            IssuePause();
+            return;
+        }
+
+        if (_roundHasDamage)
+        {
+            /*
+             * Damage already done: the round is played out first and the
+             * referee decides about the restore.
+             */
+
+            _roundInvalidated = true;
+            _snapshotLocked = true;
+
+            PrintAll(Txt.TechDamage);
+            PrintAll(Txt.TechAfterRound);
+            ShowHud(new[] { hud });
 
             // CS2 queues this until the next freeze time
+            IssuePause();
+            return;
+        }
+
+        if (!_config.RewindEnabled)
+        {
+            /*
+             * No damage, but no rollback available: voiding the round would
+             * throw it away with no way back, so it is kept and paused.
+             */
+
+            _roundInvalidated = false;
+            _snapshotLocked = false;
+
+            PrintAll(Txt.TechNoDamage);
+            PrintAll(Txt.TechRewindOff);
+            ShowHud(new[] { hud });
+
             IssuePause();
             return;
         }
@@ -533,10 +593,9 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
         _snapshotLocked = true;
 
         PrintAll(Txt.TechVoidRestoring);
-        ShowHud(new[] { Texts.Get(team < 0 ? Txt.HudTechWillFinishRef : Txt.HudTechWillFinishTeam, TeamName(team)) });
+        ShowHud(new[] { hud });
 
-        var rules = Utilities.GetGameRules();
-        rules?.TerminateRound(0.1f, RoundEndReason.RoundDraw);
+        terminate?.TerminateRound(0.1f, RoundEndReason.RoundDraw);
 
         IssuePause();
     }
@@ -551,7 +610,11 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
         _state = PauseState.TechnicalActive;
         PrintAll(Txt.TechPaused);
 
-        if (_roundInvalidated && _autoRestore)
+        if (_legacyVoid)
+        {
+            /* legacy mode never offers a restore */
+        }
+        else if (_roundInvalidated && _autoRestore)
         {
             /*
              * Voided before any damage: roll the round start state back
@@ -603,13 +666,46 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
     {
         if (!paused)
         {
-            // unpaused by something outside the plugin
-            _state = PauseState.None;
-            _callerTeam = RefereeTeam;
+            /*
+             * Unpaused outside the plugin (another plugin, a native command
+             * the listener could not see, a round restart): release every
+             * flag, otherwise the snapshot stays locked for the rest of the map.
+             */
+
+            AbortTechnicalPauseExternally();
             return;
         }
 
         ShowHud(new[] { BuildTechnicalHud() });
+    }
+
+    /// <summary>Releases a technical pause the plugin did not end itself.</summary>
+    private void AbortTechnicalPauseExternally()
+    {
+        if (_state is not (PauseState.TechnicalActive or PauseState.TechnicalPending))
+        {
+            return;
+        }
+
+        ResetTechnicalState();
+
+        PrintAll(Txt.TechServerEnded);
+        ShowHud(new[] { Texts.Get(Txt.HudTechEnded) });
+    }
+
+    /// <summary>Clears every technical pause flag; callers handle the messaging.</summary>
+    private void ResetTechnicalState()
+    {
+        _state = PauseState.None;
+        _callerTeam = RefereeTeam;
+        _roundInvalidated = false;
+        _rewindArmed = false;
+        _rewindInProgress = false;
+        _roundRestored = false;
+        _snapshotLocked = false;
+        _autoRestore = false;
+        _legacyVoid = false;
+        _pendingTicks = 0;
     }
 
     private void EndTechnicalPause(bool cancelled)
@@ -624,14 +720,7 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
             PrintAll(Txt.ResumeNoRestore);
         }
 
-        _state = PauseState.None;
-        _callerTeam = RefereeTeam;
-        _roundInvalidated = false;
-        _rewindArmed = false;
-        _roundRestored = false;
-        _snapshotLocked = false;
-        _autoRestore = false;
-        _pendingTicks = 0;
+        ResetTechnicalState();
 
         if (cancelled)
         {
@@ -765,6 +854,12 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
             return;
         }
 
+        if (_legacyVoid)
+        {
+            Reply(player, Txt.RewUnavailable);
+            return;
+        }
+
         if (!_roundInvalidated)
         {
             Reply(player, Txt.RewValid);
@@ -839,11 +934,6 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
         if (_unloading)
         {
             return;
-        }
-
-        if (_quietCommands > 0)
-        {
-            _quietCommands--;
         }
 
         var rules = Utilities.GetGameRules();
@@ -978,6 +1068,16 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
             return;
         }
 
+        /*
+         * Only a draw can lead to overtime: a regulation win (for example
+         * 16:14) must not refresh the tactical timeouts.
+         */
+
+        if (RoundSnapshotter.GetTeamScore(CsTeam.Terrorist) != RoundSnapshotter.GetTeamScore(CsTeam.CounterTerrorist))
+        {
+            return;
+        }
+
         var otRounds = Math.Max(2, CvarInt("mp_overtime_maxrounds", 6));
         var segment = (rules.TotalRoundsPlayed - maxRounds) / otRounds;
         if (segment == _currentOtSegment)
@@ -1042,17 +1142,27 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
     }
 
     /// <summary>Marks the next few commands as originating from the plugin itself.</summary>
-    private void IssuePause()
+    private void IssuePause() => ExecuteInternal("mp_pause_match");
+
+    private void IssueUnpause() => ExecuteInternal("mp_unpause_match");
+
+    private void ExecuteInternal(string command)
     {
-        _quietCommands = 3;
-        Server.ExecuteCommand("mp_pause_match");
+        _internalDepth++;
+        _internalUntilTick = Server.TickCount + 2;
+
+        try
+        {
+            Server.ExecuteCommand(command);
+        }
+        finally
+        {
+            _internalDepth--;
+        }
     }
 
-    private void IssueUnpause()
-    {
-        _quietCommands = 3;
-        Server.ExecuteCommand("mp_unpause_match");
-    }
+    private bool IsInternalCommand()
+        => _internalDepth > 0 || Server.TickCount <= _internalUntilTick;
 
     private void PrintAll(Txt id, params object[] args)
         => Server.PrintToChatAll(Texts.Chat(id, args));

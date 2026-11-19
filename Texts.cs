@@ -10,7 +10,7 @@ public enum Txt
 
     TechCalledTeam, TechCalledRef, TechDamage, TechAfterRound, TechRewindHint, TechCancelHint,
     TechPaused, TechNoDamage, TechVoidRestoring, TechInvalid, TechNoBackup, TechRewindOff, TechRefOnly, TechUnpauseHint,
-    TechEnded, TechCancelled, ResumeNoRestore,
+    TechEnded, TechCancelled, TechServerEnded, TechGateOffVoid, ResumeNoRestore,
     HudTechWillFinishRef, HudTechWillFinishTeam, HudTechRef, HudTechTeam, HudTechCancelled, HudTechEnded,
     StatusValid, StatusInvalid, StatusRestored, StatusNotRestored, StatusRestoring,
 
@@ -21,7 +21,7 @@ public enum Txt
 
     GuardTacPlayerOnly, GuardTacTeamOnly, GuardTacUsed, GuardTacNone, GuardPauseActive,
     GuardTechTeamOnly, GuardTechPreparing, GuardNoPause, GuardRestartBusy, GuardOnlyRefEnd,
-    GuardOnlyCallingTeam, GuardTacNotStarted, GuardPendingTech,
+    GuardOnlyCallingTeam, GuardTacNotStarted, GuardPendingTech, GuardWarmup,
 }
 
 /// <summary>
@@ -65,6 +65,8 @@ public static class Texts
         [Txt.TechUnpauseHint] = "{d}{0} MAY TYPE {g}!unpause",
         [Txt.TechEnded] = "{g}TECHNICAL PAUSE ENDED{d} — GET READY",
         [Txt.TechCancelled] = "{r}TECHNICAL PAUSE CANCELLED{d} — ROUND CONTINUES",
+        [Txt.TechServerEnded] = "{r}TECHNICAL PAUSE ENDED BY THE SERVER",
+        [Txt.TechGateOffVoid] = "{r}ROUND VOIDED{d} — ROUND RESTORE DISABLED (technicalDamageGate = false)",
         [Txt.ResumeNoRestore] = "{r}RESUMING WITHOUT A RESTORE{d} — THE INVALID ROUND KEEPS ITS RESULT",
         [Txt.HudTechWillFinishRef] = "TECHNICAL PAUSE REQUESTED\nTHE REFEREE\nROUND IS PLAYED OUT FIRST\nTHE ROUND WILL BE RESTORED",
         [Txt.HudTechWillFinishTeam] = "TECHNICAL PAUSE REQUESTED\n{0}\nROUND IS PLAYED OUT FIRST\nTHE ROUND WILL BE RESTORED",
@@ -111,6 +113,7 @@ public static class Texts
         [Txt.GuardOnlyCallingTeam] = "{d}ONLY THE CALLING TEAM MAY END THIS TIMEOUT",
         [Txt.GuardTacNotStarted] = "{d}THE PAUSE HAS NOT STARTED YET",
         [Txt.GuardPendingTech] = "{d}A TECHNICAL PAUSE IS ALREADY BEING PREPARED",
+        [Txt.GuardWarmup] = "{r}NOT AVAILABLE DURING WARMUP",
     };
 
     private static readonly Dictionary<Txt, string> Cn = new()
@@ -145,6 +148,8 @@ public static class Texts
         [Txt.TechUnpauseHint] = "{d}{0} 可输入 {g}!unpause",
         [Txt.TechEnded] = "{g}技术暂停结束{d} — 准备",
         [Txt.TechCancelled] = "{r}技术暂停已取消{d} — 回合继续",
+        [Txt.TechServerEnded] = "{r}技术暂停被服务器结束",
+        [Txt.TechGateOffVoid] = "{r}本回合已作废{d} — 回溯已关闭（technicalDamageGate = false）",
         [Txt.ResumeNoRestore] = "{r}未回溯直接继续{d} — 无效回合结果保留",
         [Txt.HudTechWillFinishRef] = "技术暂停请求\n发起方：裁判\n本回合先打完\n随后回溯该回合",
         [Txt.HudTechWillFinishTeam] = "技术暂停请求\n{0}\n本回合先打完\n随后回溯该回合",
@@ -191,6 +196,7 @@ public static class Texts
         [Txt.GuardOnlyCallingTeam] = "{d}只有发起方队伍可以结束本次暂停",
         [Txt.GuardTacNotStarted] = "{d}暂停尚未开始",
         [Txt.GuardPendingTech] = "{d}技术暂停正在准备中",
+        [Txt.GuardWarmup] = "{r}热身阶段不可用",
     };
 
     /// <summary>Style 2: international pack plus the rule reminders tournaments display.</summary>

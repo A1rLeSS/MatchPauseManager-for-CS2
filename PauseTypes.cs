@@ -36,6 +36,10 @@ public sealed class PlayerSnapshot
 {
     public ulong SteamId { get; set; }
 
+    /// <summary>Player slot; the snapshot is keyed by slot so that clients
+    /// sharing a SteamID (emulated servers) cannot overwrite each other.</summary>
+    public int Slot { get; set; }
+
     public string Name { get; set; } = string.Empty;
 
     public int Team { get; set; }
@@ -66,7 +70,7 @@ public sealed class RoundSnapshot
 
     public int ScoreCt { get; set; }
 
-    public Dictionary<ulong, PlayerSnapshot> Players { get; set; } = new();
+    public Dictionary<int, PlayerSnapshot> Players { get; set; } = new();
 
     public bool IsValid { get; set; }
 

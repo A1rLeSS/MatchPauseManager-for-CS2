@@ -40,6 +40,7 @@ public static class RoundSnapshotter
             var snap = new PlayerSnapshot
             {
                 SteamId = player.SteamID,
+                Slot = player.Slot,
                 Name = player.PlayerName ?? string.Empty,
                 Team = (int)player.TeamNum,
                 Money = player.InGameMoneyServices?.Account ?? 0,
@@ -70,7 +71,7 @@ public static class RoundSnapshotter
                 }
             }
 
-            snapshot.Players[snap.SteamId] = snap;
+            snapshot.Players[snap.Slot] = snap;
         }
 
         return snapshot;
@@ -103,9 +104,21 @@ public static class RoundSnapshotter
                 continue;
             }
 
-            if (!snapshot.Players.TryGetValue(player.SteamID, out var snap))
+            /*
+             * Keyed by slot: clients sharing a SteamID (emulated servers)
+             * must not overwrite each other's snapshot. The SteamID is still
+             * verified so a reconnect into the same slot is not restored.
+             */
+
+            if (!snapshot.Players.TryGetValue(player.Slot, out var snap))
             {
                 sb.Append($" [missing {player.PlayerName}]");
+                continue;
+            }
+
+            if (snap.SteamId != 0 && player.SteamID != 0 && snap.SteamId != player.SteamID)
+            {
+                sb.Append($" [slot {player.Slot} taken by another client]");
                 continue;
             }
 
@@ -121,22 +134,21 @@ public static class RoundSnapshotter
              * Equipment: at a freeze time the players normally hold a pistol
              * and a knife, but the snapshot is restored anyway so the round
              * really starts from the same loadout.
+             *
+             * The bomb is never removed or re-given: it belongs to the game
+             * and dropping it would leave the T side without a C4.
              */
 
-            if (snap.Weapons.Count > 0)
+            RemoveWeaponsExceptBomb(player);
+
+            foreach (var weapon in snap.Weapons)
             {
-                player.RemoveWeapons();
-
-                foreach (var weapon in snap.Weapons)
+                if (weapon == "weapon_c4")
                 {
-                    if (weapon == "weapon_c4")
-                    {
-                        // the bomb is owned by the game, never by the plugin
-                        continue;
-                    }
-
-                    player.GiveNamedItem(weapon);
+                    continue;
                 }
+
+                player.GiveNamedItem(weapon);
             }
 
             var pawn = player.PlayerPawn?.Value;
@@ -165,6 +177,40 @@ public static class RoundSnapshotter
         report = sb.ToString();
         logger.LogInformation("[MPM] rewind restore: {Report}", report);
         return ok;
+    }
+
+    /// <summary>
+    /// Removes every weapon except the C4, which is owned by the game.
+    /// </summary>
+    private static void RemoveWeaponsExceptBomb(CCSPlayerController player)
+    {
+        var pawn = player.PlayerPawn?.Value;
+        var weapons = pawn?.WeaponServices?.MyWeapons;
+        if (weapons == null)
+        {
+            return;
+        }
+
+        var names = new List<string>();
+        foreach (var handle in weapons)
+        {
+            var weapon = handle?.Value;
+            if (weapon == null || !weapon.IsValid)
+            {
+                continue;
+            }
+
+            var name = weapon.DesignerName;
+            if (!string.IsNullOrEmpty(name) && name != "weapon_c4")
+            {
+                names.Add(name!);
+            }
+        }
+
+        foreach (var name in names)
+        {
+            Utilities.RemoveItemByDesignerName(player, name);
+        }
     }
 
     /// <summary>

@@ -19,6 +19,7 @@ MatchPauseManager-for-CS2 是面向 CS2 竞技服务器的战术暂停与技术�
 ### 技术暂停（Technical Pause）
 - 玩家 `!tech` = 队伍发起；服务器控制台 / rcon `mp_pause_match` = **裁判**发起
 - **伤害判定**：本回合**未产生伤害**时，立即用 `CCSGameRules.TerminateRound()` 作废当前回合，在随之而来的冻结时间内暂停，并**自动回溯到回合开始前的状态**（无需裁判确认）；本回合**已产生伤害**时，先打完整回合，随后在冻结时间暂停并标记为无效，由**裁判确认**是否回溯
+- 热身阶段（warmup）内不可发起战术/技术暂停；技术暂停若被外部解除，插件会自动释放暂停状态
 - 裁判发起与队伍发起使用不同文案；裁判发起的暂停只有裁判能恢复
 - 等待期间可用 `!unpause` / `mp_unpause_match` 取消请求
 - 暂停生效后每 1 秒校验一次游戏暂停状态，避免"插件认为已暂停、服务器还在跑"
@@ -79,8 +80,8 @@ MatchPauseManager-for-CS2 是面向 CS2 竞技服务器的战术暂停与技术�
 | `tacticalTime` | `30` | 战术暂停时长（秒，1–300） |
 | `tacticalCount` | `3` | 常规赛每队战术暂停次数 |
 | `overtimeCount` | `1` | 每个加时阶段每队次数 |
-| `technicalDamageGate` | `true` | `true` = 按伤害判定；`false` = 技术暂停总是判定当前回合无效 |
-| `rewindEnabled` | `true` | 是否允许裁判回溯 |
+| `technicalDamageGate` | `true` | `true` = 按伤害判定（无伤害作废并自动回溯，有伤害打完回合后由裁判确认回溯）；`false` = 旧行为：一律立即作废回合并重开、不回溯 |
+| `rewindEnabled` | `true` | 是否允许回溯；设为 `false` 时"无伤害"分支不再作废回合（改为就地暂停保留），避免回合白丢 |
 | `rewindPlayerStats` | `true` | 回溯时是否清理无效回合的每回合统计 |
 | `textStyle` | `0` | 文案风格 `0`/`1`/`2` |
 | `warnChatDuringTechnical` | `true` | 技术暂停期间是否警告发言玩家 |
