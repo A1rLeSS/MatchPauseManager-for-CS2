@@ -4,6 +4,7 @@ using CounterStrikeSharp.API.Core.Attributes.Registration;
 using CounterStrikeSharp.API.Modules.Admin;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Cvars;
+using CounterStrikeSharp.API.Modules.Entities.Constants;
 using CounterStrikeSharp.API.Modules.Events;
 using CounterStrikeSharp.API.Modules.Timers;
 using CounterStrikeSharp.API.Modules.Utils;
@@ -25,7 +26,7 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
 {
     public override string ModuleName => "Match Pause Manager";
 
-    public override string ModuleVersion => "1.3.0";
+    public override string ModuleVersion => "1.3.1";
 
     public override string ModuleAuthor => "A1rLeSS";
 
@@ -68,6 +69,12 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
     private bool _roundHasDamage;
 
     private bool _roundInvalidated;
+
+    /// <summary>
+    /// True when the round was voided before any damage was done, so the
+    /// round start state is rolled back without a referee confirmation.
+    /// </summary>
+    private bool _autoRestore;
 
     private bool _rewindArmed;
 
@@ -204,6 +211,16 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
         if (!_snapshotLocked)
         {
             _snapshot = RoundSnapshotter.Capture(rules);
+        }
+
+        /*
+         * A technical pause is pending: make sure the freeze time that just
+         * started is paused as well (CS2 applies mp_pause_match at a freeze).
+         */
+
+        if (_state == PauseState.TechnicalPending)
+        {
+            IssuePause();
         }
 
         HandleOvertimeCounts(rules);
@@ -468,13 +485,11 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
 
         _callerTeam = team;
 
-        // damage gate: a round that has already been fought is invalidated
-        _roundInvalidated = _config.TechnicalDamageGate && _roundHasDamage;
-        _snapshotLocked = _roundInvalidated;
         _roundRestored = false;
         _rewindArmed = false;
-        _state = PauseState.TechnicalPending;
+        _autoRestore = false;
         _pendingTicks = 0;
+        _state = PauseState.TechnicalPending;
 
         if (team < 0)
         {
@@ -485,18 +500,44 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
             PrintAll(Txt.TechCalledTeam, TeamName(team));
         }
 
-        if (_roundInvalidated)
+        if (!_config.TechnicalDamageGate || _roundHasDamage)
         {
-            PrintAll(Txt.TechDamage);
-            PrintAll(Txt.TechAfterRound);
+            /*
+             * Damage already done (or the gate is disabled): the round is
+             * played out first and the referee decides about the restore.
+             */
+
+            _roundInvalidated = _config.TechnicalDamageGate && _roundHasDamage;
+            _snapshotLocked = _roundInvalidated;
+
+            if (_roundInvalidated)
+            {
+                PrintAll(Txt.TechDamage);
+                PrintAll(Txt.TechAfterRound);
+            }
+
             ShowHud(new[] { Texts.Get(team < 0 ? Txt.HudTechWillFinishRef : Txt.HudTechWillFinishTeam, TeamName(team)) });
-        }
-        else
-        {
-            ShowHud(new[] { Texts.Get(team < 0 ? Txt.HudTechWillFinishRef : Txt.HudTechWillFinishTeam, TeamName(team)) });
+
+            // CS2 queues this until the next freeze time
+            IssuePause();
+            return;
         }
 
-        // CS2 queues this until the next freeze time
+        /*
+         * No damage yet: void the round right now, pause the freeze time that
+         * follows and roll the round start state back automatically.
+         */
+
+        _roundInvalidated = true;
+        _autoRestore = true;
+        _snapshotLocked = true;
+
+        PrintAll(Txt.TechVoidRestoring);
+        ShowHud(new[] { Texts.Get(team < 0 ? Txt.HudTechWillFinishRef : Txt.HudTechWillFinishTeam, TeamName(team)) });
+
+        var rules = Utilities.GetGameRules();
+        rules?.TerminateRound(0.1f, RoundEndReason.RoundDraw);
+
         IssuePause();
     }
 
@@ -510,7 +551,29 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
         _state = PauseState.TechnicalActive;
         PrintAll(Txt.TechPaused);
 
-        if (_roundInvalidated)
+        if (_roundInvalidated && _autoRestore)
+        {
+            /*
+             * Voided before any damage: roll the round start state back
+             * without asking the referee.
+             */
+
+            if (_config.RewindEnabled && _snapshot is { IsValid: true })
+            {
+                PerformRewind(auto: true);
+            }
+            else
+            {
+                _autoRestore = false;
+                PrintAll(Txt.TechNoBackup);
+
+                if (!_config.RewindEnabled)
+                {
+                    PrintAll(Txt.TechRewindOff);
+                }
+            }
+        }
+        else if (_roundInvalidated)
         {
             _rewindArmed = _config.RewindEnabled && _snapshot is { IsValid: true } &&
                            rules.TotalRoundsPlayed == _snapshot.RoundsPlayed + 1;
@@ -567,6 +630,7 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
         _rewindArmed = false;
         _roundRestored = false;
         _snapshotLocked = false;
+        _autoRestore = false;
         _pendingTicks = 0;
 
         if (cancelled)
@@ -720,6 +784,20 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
             return;
         }
 
+        PerformRewind(auto: false);
+    }
+
+    /// <summary>
+    /// Writes the snapshot back. Used by the referee command and, without a
+    /// confirmation, for a round that was voided before any damage was done.
+    /// </summary>
+    private void PerformRewind(bool auto)
+    {
+        if (_rewindInProgress || _snapshot is not { IsValid: true })
+        {
+            return;
+        }
+
         _rewindInProgress = true;
         PrintAll(Txt.RewStart);
 
@@ -734,6 +812,7 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
 
             _roundRestored = verified;
             _rewindInProgress = false;
+            _autoRestore = false;
 
             if (verified)
             {
@@ -748,7 +827,7 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
                 PrintAll(Txt.RewStaysInvalid);
             }
 
-            Logger.LogInformation("[MPM] rewind verified={Verified} detail={Report}", verified, report);
+            Logger.LogInformation("[MPM] rewind verified={Verified} auto={Auto} detail={Report}", verified, auto, report);
             ShowHud(new[] { BuildTechnicalHud() });
         });
     }
@@ -1005,13 +1084,28 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
 
     private string BuildTechnicalHud()
     {
-        var status = !_roundInvalidated
-            ? Texts.Get(Txt.StatusValid)
-            : _rewindArmed
-                ? Texts.Get(Txt.StatusInvalid)
-                : _roundRestored
-                    ? Texts.Get(Txt.StatusRestored)
-                    : Texts.Get(Txt.StatusNotRestored);
+        string status;
+
+        if (!_roundInvalidated)
+        {
+            status = Texts.Get(Txt.StatusValid);
+        }
+        else if (_roundRestored)
+        {
+            status = Texts.Get(Txt.StatusRestored);
+        }
+        else if (_autoRestore || _rewindInProgress)
+        {
+            status = Texts.Get(Txt.StatusRestoring);
+        }
+        else if (_rewindArmed)
+        {
+            status = Texts.Get(Txt.StatusInvalid);
+        }
+        else
+        {
+            status = Texts.Get(Txt.StatusNotRestored);
+        }
 
         return _callerTeam < 0
             ? Texts.Get(Txt.HudTechRef, status)

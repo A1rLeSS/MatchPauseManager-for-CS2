@@ -117,6 +117,28 @@ public static class RoundSnapshotter
             player.MVPs = snap.Mvps;
             player.Score = snap.Score;
 
+            /*
+             * Equipment: at a freeze time the players normally hold a pistol
+             * and a knife, but the snapshot is restored anyway so the round
+             * really starts from the same loadout.
+             */
+
+            if (snap.Weapons.Count > 0)
+            {
+                player.RemoveWeapons();
+
+                foreach (var weapon in snap.Weapons)
+                {
+                    if (weapon == "weapon_c4")
+                    {
+                        // the bomb is owned by the game, never by the plugin
+                        continue;
+                    }
+
+                    player.GiveNamedItem(weapon);
+                }
+            }
+
             var pawn = player.PlayerPawn?.Value;
             if (pawn != null)
             {

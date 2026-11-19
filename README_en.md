@@ -20,8 +20,7 @@ Competitive **tactical / technical pause** manager for CS2, ported from
 
 ### Technical pause
 - `!tech` from a player = team pause; `mp_pause_match` from the server console / rcon = **referee**
-- **Damage gate**: if the round already produced damage it is played out first, then paused in the
-  next freeze time and marked invalid for a restore; without damage the round is kept
+- **Damage gate**: when the round has **no damage yet**, `CCSGameRules.TerminateRound()` voids it immediately, the freeze time that follows is paused and the **pre-round state is restored automatically** (no referee confirmation). When damage was **already done**, the round is played out first, paused in the next freeze time and the **referee decides** whether to restore it
 - Referee and team pauses use different wording; a referee pause can only be resumed by the referee
 - A pending request can be cancelled with `!unpause` / `mp_unpause_match`
 - The pause is verified every second after it is issued
@@ -29,8 +28,8 @@ Competitive **tactical / technical pause** manager for CS2, ported from
 ### Round rewind
 - Snapshot at every round start: score, round counter, per-player money, health, armour, helmet,
   defuser, weapons, MVP/score
-- After an invalidated round is paused, the referee runs `mp_rewind_match` (console / rcon) or an
-  admin runs `!rewind`
+- Rounds voided without damage are **restored automatically**; rounds that already had damage are
+  restored when the **referee confirms** (`mp_rewind_match` from console / rcon, or `!rewind` in game)
 - Restores score, round counter, money, armour/health/equipment and makes a best effort to clear the
   invalidated round from the per-round player statistics
 - Success and failure are both reported in chat and logged
@@ -73,7 +72,10 @@ See the table in the Chinese README (`tacticalTime`, `tacticalCount`, `overtimeC
 ## Differences from the CS:GO version
 
 1. **Pause timing**: CS2's `mp_pause_match` only takes effect at the next freeze time, so a round in
-   progress cannot be frozen in place. The technical pause therefore finishes the round first.
+   progress cannot be frozen in place. The plugin therefore voids the round with
+   `CCSGameRules.TerminateRound()` to create that freeze time, which makes "no damage -> void +
+   restore + pause" behave like the CS:GO version. Rounds that already had damage still have to be
+   played out.
 2. **Rewind**: CS2 has no `mp_backup_restore_load_file`, so the plugin snapshots the state and writes
    it back through the schema members.
 3. **Player K/D/A**: CS2 keeps the totals client side; only the per-round stats vector is writable, so

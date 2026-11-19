@@ -9,10 +9,10 @@ public enum Txt
     HudTacPending, HudTacActive, HudTacEnded, HudTacDeclined,
 
     TechCalledTeam, TechCalledRef, TechDamage, TechAfterRound, TechRewindHint, TechCancelHint,
-    TechPaused, TechNoDamage, TechInvalid, TechNoBackup, TechRewindOff, TechRefOnly, TechUnpauseHint,
+    TechPaused, TechNoDamage, TechVoidRestoring, TechInvalid, TechNoBackup, TechRewindOff, TechRefOnly, TechUnpauseHint,
     TechEnded, TechCancelled, ResumeNoRestore,
     HudTechWillFinishRef, HudTechWillFinishTeam, HudTechRef, HudTechTeam, HudTechCancelled, HudTechEnded,
-    StatusValid, StatusInvalid, StatusRestored, StatusNotRestored,
+    StatusValid, StatusInvalid, StatusRestored, StatusNotRestored, StatusRestoring,
 
     RewStart, RewOk, RewOkHint, RewUnverified, RewNoBackup, RewFailHint, RewStaysInvalid,
     RewNothing, RewBusy, RewValid, RewDone, RewUnavailable, RewRefOnly, RewNoPause,
@@ -57,6 +57,7 @@ public static class Texts
         [Txt.TechCancelHint] = "{d}!unpause / mp_unpause_match TO CANCEL",
         [Txt.TechPaused] = "{g}MATCH PAUSED",
         [Txt.TechNoDamage] = "{g}NO DAMAGE DONE{d} — THE ROUND IS KEPT, NOTHING TO RESTORE",
+        [Txt.TechVoidRestoring] = "{g}NO DAMAGE DONE{d} — ROUND VOIDED, RESTORING ROUND START",
         [Txt.TechInvalid] = "{r}ROUND INVALID{d} — ADMIN: {g}mp_rewind_match{d} TO RESTORE",
         [Txt.TechNoBackup] = "{r}ROUND INVALID{d} — NO SNAPSHOT AVAILABLE TO RESTORE",
         [Txt.TechRewindOff] = "{d}ROUND RESTORE DISABLED (rewindEnabled = false)",
@@ -75,6 +76,7 @@ public static class Texts
         [Txt.StatusInvalid] = "ROUND INVALID — ADMIN: mp_rewind_match",
         [Txt.StatusRestored] = "ROUND RESTORED — READY",
         [Txt.StatusNotRestored] = "ROUND INVALID — NOT RESTORED",
+        [Txt.StatusRestoring] = "ROUND VOIDED — RESTORING ROUND START",
 
         [Txt.RewStart] = "{d}ROUND RESTORE IN PROGRESS",
         [Txt.RewOk] = "{g}ROUND RESTORED{d} — SCORE {g}{0} : {1}",
@@ -135,6 +137,7 @@ public static class Texts
         [Txt.TechCancelHint] = "{d}输入 !unpause / mp_unpause_match 取消请求",
         [Txt.TechPaused] = "{g}比赛已暂停",
         [Txt.TechNoDamage] = "{g}本回合尚无伤害{d} — 回合保留，无需回溯",
+        [Txt.TechVoidRestoring] = "{g}本回合尚无伤害{d} — 已作废，正在回溯回合开始状态",
         [Txt.TechInvalid] = "{r}本回合无效{d} — 裁判输入 {g}mp_rewind_match{d} 回溯",
         [Txt.TechNoBackup] = "{r}本回合无效{d} — 没有可用的回合快照",
         [Txt.TechRewindOff] = "{d}回溯功能已关闭（rewindEnabled = false）",
@@ -153,6 +156,7 @@ public static class Texts
         [Txt.StatusInvalid] = "本回合无效 — 裁判执行 mp_rewind_match",
         [Txt.StatusRestored] = "回合已回溯 — 可以继续",
         [Txt.StatusNotRestored] = "本回合无效 — 未回溯",
+        [Txt.StatusRestoring] = "本回合已作废 — 正在回溯回合开始状态",
 
         [Txt.RewStart] = "{d}正在回溯回合",
         [Txt.RewOk] = "{g}回合已回溯{d} — 比分 {g}{0} : {1}",
@@ -196,6 +200,7 @@ public static class Texts
         [Txt.TechInvalid] = "{r}ROUND INVALID{d} — ADMIN: {g}mp_rewind_match{d} TO RESTORE | NO COMMUNICATION",
         [Txt.StatusInvalid] = "ROUND INVALID — ADMIN RESTORE | NO COMMUNICATION",
         [Txt.TechNoDamage] = "{g}NO DAMAGE DONE{d} — ROUND CONTINUES. NO COMMUNICATION DURING THE PAUSE.",
+        [Txt.TechVoidRestoring] = "{g}NO DAMAGE DONE{d} — ROUND VOIDED AND RESTORED. NO COMMUNICATION DURING THE PAUSE.",
         [Txt.TechAfterRound] = "{d}TECHNICAL PAUSE AFTER THIS ROUND — NO COMMUNICATION UNTIL THEN",
         [Txt.TacCalled] = "{g}TACTICAL TIMEOUT{d} — {0} | NO COMMUNICATION",
         [Txt.TacActive] = "{g}TACTICAL TIMEOUT{d} — {g}{0} SECONDS{d} | NO COMMUNICATION",
