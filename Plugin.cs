@@ -26,7 +26,7 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
 {
     public override string ModuleName => "Match Pause Manager";
 
-    public override string ModuleVersion => "1.3.3";
+    public override string ModuleVersion => "1.3.4";
 
     public override string ModuleAuthor => "A1rLeSS";
 
@@ -212,6 +212,28 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
     }
 
     // ------------------------------------------------------------ game events
+
+    [GameEventHandler]
+    public HookResult OnRoundFreezeEnd(EventRoundFreezeEnd @event, GameEventInfo info)
+    {
+        /*
+         * The round is live now: the team scores are final and the snapshot
+         * of this round has to carry them. Without this refresh a restore of a
+         * round voided right after the freeze could roll the scoreboard back a
+         * whole round (for example to 0:0 after round 1).
+         */
+
+        var rules = Utilities.GetGameRules();
+        if (_snapshot is { IsValid: true } &&
+            rules != null &&
+            rules.TotalRoundsPlayed == _snapshot.RoundsPlayed)
+        {
+            _snapshot.ScoreT = RoundSnapshotter.GetTeamScore(CsTeam.Terrorist);
+            _snapshot.ScoreCt = RoundSnapshotter.GetTeamScore(CsTeam.CounterTerrorist);
+        }
+
+        return HookResult.Continue;
+    }
 
     [GameEventHandler]
     public HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
@@ -570,6 +592,24 @@ public sealed class MatchPauseManagerPlugin : BasePlugin
             ShowHud(new[] { hud });
 
             // CS2 queues this until the next freeze time
+            IssuePause();
+            return;
+        }
+
+        if (terminate is { FreezePeriod: true })
+        {
+            /*
+             * Freeze time of a fresh round: nothing has happened yet, so
+             * there is nothing to undo. Voiding here could roll the
+             * scoreboard back a whole round, so the round is kept.
+             */
+
+            _roundInvalidated = false;
+            _snapshotLocked = false;
+
+            PrintAll(Txt.TechFreezeKeep);
+            ShowHud(new[] { hud });
+
             IssuePause();
             return;
         }
