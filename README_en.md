@@ -1,10 +1,11 @@
-**Read this in other languages:**
+**Languages:**
 [English](README_en.md) | [中文](README.md)
 
 # MatchPauseManager-for-CS2
 
-Competitive **tactical / technical pause** manager for CS2, ported from
-[MatchPauseManager-for-CSGO](https://github.com/A1rLeSS/MatchPauseManager-for-CSGO) (SourceMod / SourcePawn, V1.2.6).
+MatchPauseManager-for-CS2 manages tactical and technical pauses on CS2 competitive servers. It handles pause limits, technical-pause round handling, and referee-controlled round rewinds.
+
+The plugin is built for CounterStrikeSharp and Metamod:Source. Since SourceMod does not support CS2, this is a rewrite of the CS:GO plugin, not a direct port.
 
 > **Note**: SourceMod does not support CS2. This is a **rewrite** on top of
 > **Metamod:Source 2.0 + CounterStrikeSharp (C# / .NET 10)**, not a recompilation of the `.sp` file.
@@ -66,8 +67,18 @@ Competitive **tactical / technical pause** manager for CS2, ported from
 
 ## Configuration
 
-See the table in the Chinese README (`tacticalTime`, `tacticalCount`, `overtimeCount`,
-`technicalDamageGate`, `rewindEnabled`, `rewindPlayerStats`, `textStyle`, `warnChatDuringTechnical`).
+The plugin creates `config.json` in its plugin directory on first load. Edit the file and reload the plugin or restart the server for changes to take effect.
+
+| Setting | Default | Description |
+| --- | ---: | --- |
+| `tacticalTime` | `30` | Tactical pause duration in seconds (1–300). |
+| `tacticalCount` | `3` | Tactical pauses available to each team during regulation. |
+| `overtimeCount` | `1` | Tactical pauses available to each team per overtime segment. |
+| `technicalDamageGate` | `true` | If `true`, round handling depends on whether damage has occurred. If `false`, a technical pause always voids the current round. |
+| `rewindEnabled` | `true` | Allows referees to rewind an invalidated round. |
+| `rewindPlayerStats` | `true` | Attempts to clear per-round player stats when rewinding. |
+| `textStyle` | `0` | Message pack: `0` international English, `1` Chinese, `2` international English with rule reminders. |
+| `warnChatDuringTechnical` | `true` | Warns players who chat during a technical pause. |
 
 ## Differences from the CS:GO version
 

@@ -1,11 +1,11 @@
-**Read this in other languages:**
+**语言：**
 [English](README_en.md) | [中文](README.md)
 
 # MatchPauseManager-for-CS2
 
-CS2 版的**战术暂停 / 技术暂停**比赛管理插件，是 [MatchPauseManager-for-CSGO](https://github.com/A1rLeSS/MatchPauseManager-for-CSGO)（SourceMod / SourcePawn，V1.2.6）的移植版本。
+MatchPauseManager-for-CS2 是面向 CS2 竞技服务器的战术暂停与技术暂停管理插件，支持暂停次数和时长管理、技术暂停回合处理及裁判回溯。插件基于 CounterStrikeSharp 和 Metamod:Source 实现；由于 SourceMod 不支持 CS2，本项目是重写版本，而非 CS:GO 插件的直接移植。
 
-> **重要**：SourceMod 不支持 CS2，因此本版本是基于 **Metamod:Source 2.0 + CounterStrikeSharp（C#/.NET 10）** 的**重写式移植**，不是把 `.sp` 编译一下就能用的直接移植。
+> **运行环境**：Metamod:Source 2.0、CounterStrikeSharp 1.0.380 和 .NET 10。
 
 ## 功能
 
